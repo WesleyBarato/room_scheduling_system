@@ -1,0 +1,44 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.container {
+    max-width: 400px;
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    height: 500px;
+    width: 800px;
+}
+
+.logo {
+    width: 120px;
+}
+
+.input-custom {
+    border: 2px solid #555;
+    border-radius: 5px;
+}
+
+.btn-primary {
+    width: 100%;
+    border-radius: 20px;
+    background-color: #0056b3;
+}
+
+.footer {
+    background-color: #0056b3;
+    color: white;
+    text-align: center;
+    padding: 15px;
+    width: 100%;
+    position: fixed;
+    bottom: 0;
+}
+
+.footer p {
+    margin: 5px 0;
+    font-size: 14px;
+}

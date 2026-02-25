@@ -1,0 +1,200 @@
+/* Estilos gerais do corpo da página */
+html, body {
+    font-family: Arial, sans-serif; /* Define a fonte */
+    background-color: #f8f9fa; /* Cor de fundo */
+    flex-direction: column;
+}
+.tudo{
+    margin: 0;
+    padding: 0;
+    display: flex;
+}
+/* Estilização do cabeçalho da tabela */
+th {
+    background-color: #0056b3; /* Define a cor de fundo do cabeçalho do calendário */
+}
+/* Ícone de Logout (agora com imagem) */
+#logoutIcon {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    width: 40px; /* Tamanho da imagem */
+    height: 40px;
+    cursor: pointer;
+    border-radius: 50%; /* Deixa a imagem redonda (opcional) */
+    transition: transform 0.2s ease;
+}
+
+#logoutIcon:hover {
+    transform: scale(1.1); /* Efeito de zoom ao passar o mouse */
+}
+
+
+/* Container principal */
+.container {
+    flex: 1;
+    padding: 20px;
+    flex: 1;
+}
+
+/* Estilização da logo */
+.logo {
+    display: block;
+    margin: 0 auto 20px;
+    width: 100px;
+}
+
+/* Formulário de agendamento */
+.form-container {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Sombra ao redor do formulário */
+    height: 750px;
+}
+
+/* Personalização dos inputs */
+.input-custom {
+    border: 2px solid #555;
+    border-radius: 5px;
+}
+
+/* Botões padrão azul escuro com bordas arredondadas */
+.btn-primary,
+.btn-success {
+    width: 100%;
+    border-radius: 20px;
+    background-color: #0056b3;
+    border: none;
+}
+
+.btn-primary:hover,
+.btn-success:hover {
+    background-color: #004494;
+}
+.btn-danger {
+    width: 100%;
+    border-radius: 20px;
+    background-color: #e90606;
+    border: none;
+}
+/* Botões de remover pequenos no modal */
+.btn-remover {
+    width: auto;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    border-radius: 10px;
+    background-color: #e90606;
+    color: white;
+    border: none;
+}
+
+.btn-remover:hover {
+    background-color: #c40000;
+}
+
+/* Container do calendário */
+.calendar-container {
+    text-align: center;
+    padding: 15px;
+    border-radius: 15px;
+    background: white;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    display: inline-block;
+}
+
+/* Cabeçalho do calendário */
+.calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.calendar-header span {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 10px;
+}
+
+/* Estilização da tabela do calendário */
+.calendar-table {
+    width: 100%;
+    border-collapse: separate; /* Permite bordas arredondadas */
+    border-spacing: 4px;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Cabeçalho e células */
+.calendar-table th,
+.calendar-table td {
+    border: 1px solid #000;
+    padding: 5px;
+    text-align: center;
+    width: 14%;
+    height: 100px;
+    position: relative;
+    vertical-align: top;
+    box-sizing: border-box;
+    border-radius: 10px;
+    background: white;
+}
+
+/* Células interativas */
+.calendar-table td {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.calendar-table td:hover {
+    background: white;
+}
+
+/* Container de agendamentos com scroll */
+.agendamentos {
+    max-height: 65px;
+    overflow-y: auto;
+    margin-top: 5px;
+    scrollbar-width: thin; /* Firefox */
+}
+
+/* Estilo dos agendamentos */
+.agendamento {
+    font-size: 11px;
+    background-color: greenyellow;
+    padding: 2px 4px;
+    border-radius: 4px;
+    margin-bottom: 3px;
+    text-align: left;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+
+
+/* Dia selecionado */
+.selected-day {
+    background-color: lightskyblue !important;
+    color: white;
+    font-weight: bold;
+    border-radius: 5px;
+}
+
+/* Estiliza o ícone do menu */
+#menuIcon {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 10px;
+    background: #0056b3;
+    color: white;
+    border-radius: 5px;
+}
+
+.footer-custom {
+    background-color: #0056b3;
+    color: white;
+}
