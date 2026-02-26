@@ -1,21 +1,71 @@
 import "./dashboard.css";
 import { supabase } from "./supabase.js";
 
-const { data, error } = await supabase.from("rooms").select("*");
+// DATA - functions that are connected with the database(supabase)
+async function getRooms() {
+  return await supabase.from("rooms").select("*");
+}
 
-// Popula selects com opções
-const select = document.getElementById("salas");
-select.innerHTML = '<option value="">Selecione</option>';
-data.forEach((element, index) => {
-  console.log(element.name);
-  const opt = document.createElement("option");
-  opt.value = element.name;
-  opt.textContent = element.name;
-  select.appendChild(opt);
+async function createRoom(room) {
+  return await supabase.from("rooms").insert(room);
+}
+
+// UI
+
+async function loadRoomsSelect() {
+  const { data, error } = await getRooms();
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  // Popula selects com opções
+  const select = document.getElementById("salas");
+  select.innerHTML = '<option value="">Selecione</option>';
+  data.forEach((element, index) => {
+    console.log(element.name);
+    const opt = document.createElement("option");
+    opt.value = element.name;
+    opt.textContent = element.name;
+    select.appendChild(opt);
+  });
+}
+
+// HANDLER
+
+async function handleRoomSubmit(event) {
+  event.preventDefault();
+
+  // aqui você pega valores do formulário:
+  const room = document.getElementById("newRoom").value;
+
+  // e monta o objeto:
+  const newRoom = {
+    name: room,
+  };
+
+  const { data, error } = await createRoom(newRoom);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  alert("Sala criada!");
+  await loadRoomsSelect();
+}
+
+// INIT
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadRoomsSelect();
 });
 
-if (error) console.error(error);
-else console.log(data);
+let buttonAddRoom = document.getElementById("buttonAddRoom");
+if (buttonAddRoom) {
+  buttonAddRoom.addEventListener("click", handleRoomSubmit);
+}
 
 //Meses e quantidade de dias
 // const months = [
