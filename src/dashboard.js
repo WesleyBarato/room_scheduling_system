@@ -6,8 +6,25 @@ async function getRooms() {
   return await supabase.from("rooms").select("*");
 }
 
+async function getTeachers() {
+  return await supabase.from("teachers").select("*");
+}
+
 async function createRoom(room) {
-  return await supabase.from("rooms").insert(room);
+  if (!room) {
+    return await supabase.from("rooms").insert(room);
+  } else {
+    alert("Esta sala já existe!");
+  }
+}
+
+async function createTeacher(teacher) {
+  const { data, error } = await supabase
+    .from("teachers")
+    .insert(teacher)
+    .select();
+
+  return { data, error };
 }
 
 // UI
@@ -20,8 +37,43 @@ async function loadRoomsSelect() {
     return;
   }
 
-  // Popula selects com opções
+  // fill selects with options
   const select = document.getElementById("salas");
+  select.innerHTML = '<option value="">Selecione</option>';
+  data.forEach((element, index) => {
+    console.log(element.name);
+    const opt = document.createElement("option");
+    opt.value = element.name;
+    opt.textContent = element.name;
+    select.appendChild(opt);
+  });
+}
+
+async function loadTurnsSelect() {
+  const shifts = ["Manhã", "Tarde", "Noite"];
+
+  // fill selects with options
+  const select = document.getElementById("shift");
+  select.innerHTML = '<option value="">Selecione o turno</option>';
+  shifts.forEach((element) => {
+    console.log(element);
+    const opt = document.createElement("option");
+    opt.value = element;
+    opt.textContent = element;
+    select.appendChild(opt);
+  });
+}
+
+async function loadTeachersSelect() {
+  const { data, error } = await getTeachers();
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  // fill selects with options
+  const select = document.getElementById("professor");
   select.innerHTML = '<option value="">Selecione</option>';
   data.forEach((element, index) => {
     console.log(element.name);
@@ -37,10 +89,10 @@ async function loadRoomsSelect() {
 async function handleRoomSubmit(event) {
   event.preventDefault();
 
-  // aqui você pega valores do formulário:
+  // get the room value
   const room = document.getElementById("newRoom").value;
 
-  // e monta o objeto:
+  // create the object
   const newRoom = {
     name: room,
   };
@@ -56,15 +108,60 @@ async function handleRoomSubmit(event) {
   await loadRoomsSelect();
 }
 
+async function handleTeachersSubmit(event) {
+  event.preventDefault();
+
+  const input = document.getElementById("novoProfessor");
+  if (!input) return;
+
+  const teacherName = input.value.trim(); // remove espaços nas pontas
+
+  // ✅ impede vazio e "só espaços"
+  if (!teacherName) {
+    alert("Digite o nome do professor.");
+    input.focus();
+    return;
+  }
+
+  const newTeacher = { name: teacherName };
+
+  const { data, error } = await createTeacher(newTeacher);
+
+  if (error) {
+    console.error(error);
+
+    // (opcional) mensagem amigável se for UNIQUE
+    if (error.code === "23505") alert("Professor já existe.");
+    return;
+  }
+
+  alert("Professor adicionado!");
+  input.value = ""; // limpa campo
+  await loadTeachersSelect(); // atualiza o select
+}
+
 // INIT
 
 document.addEventListener("DOMContentLoaded", () => {
   loadRoomsSelect();
 });
 
+document.addEventListener("DOMContentLoaded", () => {
+  loadTurnsSelect();
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadTeachersSelect();
+});
+
 let buttonAddRoom = document.getElementById("buttonAddRoom");
 if (buttonAddRoom) {
   buttonAddRoom.addEventListener("click", handleRoomSubmit);
+}
+
+let buttonAddTeacher = document.getElementById("buttonAddTeacher");
+if (buttonAddTeacher) {
+  buttonAddTeacher.addEventListener("click", handleTeachersSubmit);
 }
 
 //Meses e quantidade de dias
