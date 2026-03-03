@@ -27,6 +27,38 @@ async function createTeacher(teacher) {
   return { data, error };
 }
 
+async function getBookings(month, year, roomId = null) {
+  const startDate = new Date(year, month, 1).toISOString().split("T")[0];
+  const endDate = new Date(year, month + 1, 0).toISOString().split("T")[0];
+
+  let query = supabase
+    .from("bookings")
+    .select("id, date, period, room_id, teacher_id, rooms(name), teachers(name)")
+    .gte("date", startDate)
+    .lte("date", endDate);
+
+  if (roomId) {
+    query = query.eq("room_id", roomId);
+  }
+
+  const { data, error } = await query;
+  return { data: data || [], error };
+}
+
+async function createBooking(booking) {
+  const { data, error } = await supabase
+    .from("bookings")
+    .insert(booking)
+    .select();
+
+  return { data, error };
+}
+
+async function deleteBooking(id) {
+  const { error } = await supabase.from("bookings").delete().eq("id", id);
+  return { error };
+}
+
 // UI
 
 async function loadRoomsSelect() {
@@ -40,10 +72,9 @@ async function loadRoomsSelect() {
   // fill selects with options
   const select = document.getElementById("salas");
   select.innerHTML = '<option value="">Selecione</option>';
-  data.forEach((element, index) => {
-    console.log(element.name);
+  data.forEach((element) => {
     const opt = document.createElement("option");
-    opt.value = element.name;
+    opt.value = element.id;
     opt.textContent = element.name;
     select.appendChild(opt);
   });
@@ -75,10 +106,9 @@ async function loadTeachersSelect() {
   // fill selects with options
   const select = document.getElementById("professor");
   select.innerHTML = '<option value="">Selecione</option>';
-  data.forEach((element, index) => {
-    console.log(element.name);
+  data.forEach((element) => {
     const opt = document.createElement("option");
-    opt.value = element.name;
+    opt.value = element.id;
     opt.textContent = element.name;
     select.appendChild(opt);
   });
@@ -140,18 +170,124 @@ async function handleTeachersSubmit(event) {
   await loadTeachersSelect(); // atualiza o select
 }
 
+// Abre o modal com agendamentos do dia
+function abrirModalAgendamentosDoDia(day, bookings) {
+  const modalEl = document.getElementById("dayBookingsModal");
+  const titleEl = document.getElementById("dayBookingsModalLabel");
+  const listEl = document.getElementById("dayBookingsList");
+  if (!modalEl || !titleEl || !listEl) return;
+
+  titleEl.textContent = `Agendamentos do dia ${day}`;
+  const teacherName = (a) => (a.teachers && a.teachers.name) || "-";
+  listEl.innerHTML =
+    bookings.length === 0
+      ? "<p class='text-muted small mb-0'>Nenhum agendamento.</p>"
+      : bookings
+          .map(
+            (a) => `
+          <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light">
+            <span class="small">${teacherName(a)} · ${a.period}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger py-0 remove-agendamento-modal" data-id="${a.id}">×</button>
+          </div>
+        `
+          )
+          .join("");
+
+  listEl.querySelectorAll(".remove-agendamento-modal").forEach((btn) => {
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const id = btn.getAttribute("data-id");
+      if (id && confirm("Deseja remover este agendamento?")) {
+        removerAgendamento(id).then(() => {
+          const bsModal = bootstrap.Modal.getInstance(modalEl);
+          if (bsModal) bsModal.hide();
+        });
+      }
+    });
+  });
+
+  const modal = new bootstrap.Modal(modalEl);
+  modal.show();
+}
+
+// Event delegation para calendário (clique no dia, ver mais e remover)
+function setupCalendarEvents() {
+  const calendarBody = document.getElementById("calendarBody");
+  if (!calendarBody) return;
+
+  calendarBody.addEventListener("click", (e) => {
+    const removeBtn = e.target.closest(".remove-agendamento");
+    if (removeBtn) {
+      e.stopPropagation();
+      const id = removeBtn.getAttribute("data-id");
+      if (id && confirm("Deseja remover este agendamento?")) {
+        removerAgendamento(id);
+      }
+      return;
+    }
+
+    const verMaisBtn = e.target.closest(".btn-ver-mais");
+    if (verMaisBtn) {
+      e.stopPropagation();
+      const dayCell = verMaisBtn.closest(".day-cell");
+      const day = dayCell?.getAttribute("data-day");
+      const bookingsJson = dayCell?.getAttribute("data-bookings");
+      let bookings = [];
+      try {
+        bookings = bookingsJson ? JSON.parse(decodeURIComponent(bookingsJson)) : [];
+      } catch (_) {}
+      if (day) abrirModalAgendamentosDoDia(day, bookings);
+      return;
+    }
+
+    const dayCell = e.target.closest(".day-cell");
+    if (dayCell) {
+      selecionarDia(dayCell);
+      const day = dayCell.getAttribute("data-day");
+      const bookingsJson = dayCell.getAttribute("data-bookings");
+      let bookings = [];
+      try {
+        bookings = bookingsJson ? JSON.parse(decodeURIComponent(bookingsJson)) : [];
+      } catch (_) {}
+      if (bookings.length > 0) abrirModalAgendamentosDoDia(day, bookings);
+    }
+  });
+}
+
+// Logout e abrir editor (usados pelo HTML onclick)
+function logout() {
+  window.location.href = "index.html";
+}
+
+function abrirEditor() {
+  const modal = document.getElementById("editorModal");
+  if (modal && typeof bootstrap !== "undefined") {
+    new bootstrap.Modal(modal).show();
+  }
+}
+
+// Expor para onclick no HTML (ES modules não coloca funções no global)
+window.logout = logout;
+window.abrirEditor = abrirEditor;
+
 // INIT
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   loadRoomsSelect();
-});
-
-document.addEventListener("DOMContentLoaded", () => {
   loadTurnsSelect();
-});
-
-document.addEventListener("DOMContentLoaded", () => {
   loadTeachersSelect();
+  setupCalendarEvents();
+  await generateCalendar();
+
+  const prevMonthBtn = document.getElementById("prevMonth");
+  const nextMonthBtn = document.getElementById("nextMonth");
+  const confirmarBtn = document.getElementById("confirmarAgendamento");
+  const salasSelect = document.getElementById("salas");
+
+  if (prevMonthBtn) prevMonthBtn.addEventListener("click", () => changeMonth(-1));
+  if (nextMonthBtn) nextMonthBtn.addEventListener("click", () => changeMonth(1));
+  if (confirmarBtn) confirmarBtn.addEventListener("click", confirmarAgendamento);
+  if (salasSelect) salasSelect.addEventListener("change", generateCalendar);
 });
 
 let buttonAddRoom = document.getElementById("buttonAddRoom");
@@ -164,305 +300,184 @@ if (buttonAddTeacher) {
   buttonAddTeacher.addEventListener("click", handleTeachersSubmit);
 }
 
-//Meses e quantidade de dias
-// const months = [
-//   "JAN",
-//   "FEV",
-//   "MAR",
-//   "ABR",
-//   "MAI",
-//   "JUN",
-//   "JUL",
-//   "AGO",
-//   "SET",
-//   "OUT",
-//   "NOV",
-//   "DEZ",
-// ];
-// const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-// let currentMonth = new Date().getMonth(); // abre no mês atual
+// Meses e quantidade de dias
+const months = [
+  "JAN", "FEV", "MAR", "ABR", "MAI", "JUN",
+  "JUL", "AGO", "SET", "OUT", "NOV", "DEZ",
+];
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
 
-// // Dados do localStorage
-// let agendamentosPorSala =
-//   JSON.parse(localStorage.getItem("agendamentosPorSala")) || {};
-// let salas = JSON.parse(localStorage.getItem("salas")) || [
-//   "Sala 101",
-//   "Sala 102",
-// ];
-// let professores = JSON.parse(localStorage.getItem("professores")) || [
-//   "Prof. Ana",
-//   "Prof. Carlos",
-// ];
-// const turnos = ["Manhã", "Tarde", "Noite"];
+function getDaysInMonth(month, year) {
+  if (month === 1) {
+    const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    return isLeap ? 29 : 28;
+  }
+  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return days[month];
+}
 
-// // Popula selects com opções
-// function populateSelect(id, options) {
-//   const select = document.getElementById(id);
-//   select.innerHTML = '<option value="">Selecione</option>';
-//   options.forEach((opcao) => {
-//     const opt = document.createElement("option");
-//     opt.value = opcao;
-//     opt.textContent = opcao;
-//     select.appendChild(opt);
-//   });
-// }
+// Verifica se a data YYYY-MM-DD corresponde ao dia/mês/ano (evita bug de timezone)
+function dateMatches(dateStr, day, month, year) {
+  if (!dateStr) return false;
+  const parts = dateStr.split("-");
+  return (
+    parseInt(parts[0], 10) === year &&
+    parseInt(parts[1], 10) === month + 1 &&
+    parseInt(parts[2], 10) === day
+  );
+}
 
-// // Gera o calendário do mês atual
-// function generateCalendar() {
-//   const calendarBody = document.getElementById("calendarBody");
-//   calendarBody.innerHTML = "";
+// Gera o calendário do mês atual
+async function generateCalendar() {
+  const calendarBody = document.getElementById("calendarBody");
+  const monthNameEl = document.getElementById("monthName");
+  if (!calendarBody || !monthNameEl) return;
 
-//   const firstDay = new Date(2025, currentMonth, 1).getDay();
-//   const numDays = daysInMonth[currentMonth];
-//   const salaAtual = document.getElementById("salas").value;
-//   const agendamentosSala = (agendamentosPorSala[salaAtual] || []).filter(
-//     (a) => a.mes === currentMonth,
-//   );
+  const roomId = document.getElementById("salas")?.value;
+  const { data: agendamentos } = await getBookings(currentMonth, currentYear, roomId || undefined);
+  const agendamentosList = agendamentos || [];
 
-//   let row = "<tr>";
-//   for (let i = 0; i < firstDay; i++) {
-//     row += "<td></td>";
-//   }
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const numDays = getDaysInMonth(currentMonth, currentYear);
 
-//   for (let day = 1; day <= numDays; day++) {
-//     if ((firstDay + day - 1) % 7 === 0 && day !== 1) row += "</tr><tr>";
+  let html = "";
+  let dayCount = 1;
 
-//     const agendamentosDoDia = agendamentosSala.filter((a) => a.dia === day);
-//     const conteudoAgendamentos = agendamentosDoDia
-//       .map(
-//         (a) => `
-//             <div class="agendamento">
-//                 ${a.professor}<br>${a.turno}
-//                 <span class="remove-agendamento" onclick="removerAgendamento(${a.dia}, ${a.mes}, '${a.professor}', '${a.turno}', '${a.sala}')">❌</span>
-//             </div>
-//         `,
-//       )
-//       .join("");
+  for (let row = 0; row < 6; row++) {
+    html += "<tr>";
+    for (let col = 0; col < 7; col++) {
+      const cellIndex = row * 7 + col;
+      if (cellIndex < firstDay || dayCount > numDays) {
+        html += "<td></td>";
+      } else {
+        const day = dayCount;
+        const agendamentosDoDia = agendamentosList.filter(
+          (a) => dateMatches(a.date, day, currentMonth, currentYear) && (roomId ? a.room_id == roomId : true)
+        );
+        const teacherName = (a) => (a.teachers && a.teachers.name) || "-";
+        const MAX_VISIBLE = 2;
+        const visible = agendamentosDoDia.slice(0, MAX_VISIBLE);
+        const restCount = agendamentosDoDia.length - MAX_VISIBLE;
+        const conteudoVisivel = visible
+          .map(
+            (a) => `<div class="agendamento-compact" data-id="${a.id}">
+              <span class="agend-txt">${teacherName(a)} · ${a.period}</span>
+              <span class="remove-agendamento" data-id="${a.id}">×</span>
+            </div>`
+          )
+          .join("");
+        const verMais =
+          restCount > 0
+            ? `<button type="button" class="btn-ver-mais" data-day="${day}" data-count="${agendamentosDoDia.length}">+${restCount} ver</button>`
+            : "";
+        const bookingsJson = JSON.stringify(agendamentosDoDia);
 
-//     row += `<td data-day="${day}" onclick="selecionarDia(this)">
-//                     ${day}
-//                     <div class="agendamentos">${conteudoAgendamentos}</div>
-//                 </td>`;
-//   }
+        html += `<td class="day-cell" data-day="${day}" data-bookings='${encodeURIComponent(bookingsJson)}'>
+          <span class="day-number">${day}</span>
+          <div class="agendamentos-inline">${conteudoVisivel}${verMais}</div>
+        </td>`;
+        dayCount++;
+      }
+    }
+    html += "</tr>";
+    if (dayCount > numDays) break;
+  }
 
-//   row += "</tr>";
-//   calendarBody.innerHTML = row;
-//   document.getElementById("monthName").innerText = months[currentMonth];
-// }
+  calendarBody.innerHTML = html;
+  monthNameEl.textContent = `${months[currentMonth]} ${currentYear}`;
+}
 
-// // Selecionar ou desselecionar um dia
-// function selecionarDia(td) {
-//   const jaSelecionado = td.classList.contains("selected-day");
-//   document
-//     .querySelectorAll("#calendarBody td")
-//     .forEach((d) => d.classList.remove("selected-day"));
-//   if (!jaSelecionado) td.classList.add("selected-day");
-// }
+// Selecionar ou desselecionar um dia
+function selecionarDia(td) {
+  if (!td || !td.classList.contains("day-cell")) return;
+  const jaSelecionado = td.classList.contains("selected-day");
+  document.querySelectorAll("#calendarBody .day-cell").forEach((d) => d.classList.remove("selected-day"));
+  if (!jaSelecionado) td.classList.add("selected-day");
+}
 
-// // Mudar o mês
-// function changeMonth(step) {
-//   currentMonth = (currentMonth + step + 12) % 12;
-//   generateCalendar();
-// }
+// Mudar o mês
+function changeMonth(step) {
+  currentMonth += step;
+  if (currentMonth > 11) {
+    currentMonth = 0;
+    currentYear++;
+  } else if (currentMonth < 0) {
+    currentMonth = 11;
+    currentYear--;
+  }
+  generateCalendar();
+}
 
-// // Confirma o agendamento
-// function confirmarAgendamento() {
-//   const sala = document.getElementById("salas").value;
-//   const turno = document.getElementById("turno").value;
-//   const professor = document.getElementById("professor").value;
-//   const diaSelecionado = document.querySelector(".selected-day");
+// Confirma o agendamento
+async function confirmarAgendamento() {
+  const roomId = document.getElementById("salas")?.value;
+  const period = document.getElementById("shift")?.value;
+  const teacherId = document.getElementById("professor")?.value;
+  const diaSelecionado = document.querySelector("#calendarBody .selected-day");
 
-//   if (!sala || !turno || !professor) {
-//     alert("Preencha todos os campos antes de agendar.");
-//     return;
-//   }
+  if (!roomId || !period || !teacherId) {
+    alert("Preencha todos os campos (sala, turno e professor) antes de agendar.");
+    return;
+  }
 
-//   if (!diaSelecionado) {
-//     alert("Selecione um dia no calendário.");
-//     return;
-//   }
+  if (!diaSelecionado) {
+    alert("Selecione um dia no calendário.");
+    return;
+  }
 
-//   const dia = parseInt(diaSelecionado.getAttribute("data-day"));
+  const day = parseInt(diaSelecionado.getAttribute("data-day"), 10);
+  const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-//   if (!agendamentosPorSala[sala]) agendamentosPorSala[sala] = [];
+  const { data: agendamentosExistentes } = await getBookings(currentMonth, currentYear, roomId);
 
-//   const conflitoSala = agendamentosPorSala[sala].some(
-//     (a) => a.dia === dia && a.mes === currentMonth && a.turno === turno,
-//   );
-//   if (conflitoSala) {
-//     alert("Essa sala já está agendada para esse turno nesse dia.");
-//     return;
-//   }
+  const conflitoSala = (agendamentosExistentes || []).some(
+    (a) => dateMatches(a.date, day, currentMonth, currentYear) && a.room_id == roomId && a.period === period
+  );
+  if (conflitoSala) {
+    alert("Essa sala já está agendada para esse turno nesse dia.");
+    return;
+  }
 
-//   const conflitoProfessor = Object.values(agendamentosPorSala)
-//     .flat()
-//     .some(
-//       (a) =>
-//         a.professor === professor &&
-//         a.dia === dia &&
-//         a.mes === currentMonth &&
-//         a.turno === turno,
-//     );
-//   if (conflitoProfessor) {
-//     alert("Esse professor já está agendado em outra sala nesse turno e dia.");
-//     return;
-//   }
+  const { data: allBookings } = await getBookings(currentMonth, currentYear, null);
+  const conflitoProfessor = (allBookings || []).some(
+    (a) =>
+      a.teacher_id == teacherId &&
+      dateMatches(a.date, day, currentMonth, currentYear) &&
+      a.period === period
+  );
+  if (conflitoProfessor) {
+    alert("Esse professor já está agendado em outra sala nesse turno e dia.");
+    return;
+  }
 
-//   const novoAgendamento = {
-//     dia,
-//     mes: currentMonth,
-//     professor,
-//     turno,
-//     sala,
-//   };
+  const novoBooking = {
+    room_id: parseInt(roomId, 10),
+    teacher_id: parseInt(teacherId, 10),
+    date: dateStr,
+    period,
+  };
 
-//   agendamentosPorSala[sala].push(novoAgendamento);
-//   localStorage.setItem(
-//     "agendamentosPorSala",
-//     JSON.stringify(agendamentosPorSala),
-//   );
-//   generateCalendar();
-// }
+  const { error } = await createBooking(novoBooking);
 
-// // Remove um agendamento
-// function removerAgendamento(dia, mes, professor, turno, sala) {
-//   const confirmar = confirm(
-//     `Deseja remover o agendamento de ${professor} na sala ${sala} (${turno}) do dia ${dia}/${mes + 1}?`,
-//   );
-//   if (!confirmar) return;
+  if (error) {
+    console.error(error);
+    alert("Erro ao salvar agendamento. Verifique a tabela 'bookings' no Supabase.");
+    return;
+  }
 
-//   if (!agendamentosPorSala[sala]) return;
+  alert("Agendamento salvo com sucesso!");
+  diaSelecionado.classList.remove("selected-day");
+  await generateCalendar();
+}
 
-//   agendamentosPorSala[sala] = agendamentosPorSala[sala].filter(
-//     (a) =>
-//       !(
-//         a.dia === dia &&
-//         a.mes === mes &&
-//         a.professor === professor &&
-//         a.turno === turno
-//       ),
-//   );
-
-//   if (agendamentosPorSala[sala].length === 0) {
-//     delete agendamentosPorSala[sala];
-//   }
-
-//   localStorage.setItem(
-//     "agendamentosPorSala",
-//     JSON.stringify(agendamentosPorSala),
-//   );
-//   generateCalendar();
-// }
-// function adicionarSala() {
-//   const novaSala = document.getElementById("novaSala").value.trim();
-//   if (!novaSala) return;
-
-//   if (salas.includes(novaSala)) {
-//     alert("Essa sala já está cadastrada.");
-//     return;
-//   }
-
-//   const confirmar = confirm(`Deseja adicionar a sala "${novaSala}"?`);
-//   if (!confirmar) return;
-
-//   salas.push(novaSala);
-//   localStorage.setItem("salas", JSON.stringify(salas));
-//   populateSelect("salas", salas);
-//   atualizarListaSalas();
-//   document.getElementById("novaSala").value = "";
-// }
-
-// function adicionarProfessor() {
-//   const novoProfessor = document.getElementById("novoProfessor").value.trim();
-//   if (!novoProfessor) return;
-
-//   if (professores.includes(novoProfessor)) {
-//     alert("Esse professor já está cadastrado.");
-//     return;
-//   }
-
-//   const confirmar = confirm(`Deseja adicionar o professor "${novoProfessor}"?`);
-//   if (!confirmar) return;
-
-//   professores.push(novoProfessor);
-//   localStorage.setItem("professores", JSON.stringify(professores));
-//   populateSelect("professor", professores);
-//   atualizarListaProfessores();
-//   document.getElementById("novoProfessor").value = "";
-// }
-
-// // Modal de edição
-// function abrirEditor() {
-//   atualizarListaProfessores();
-//   atualizarListaSalas();
-//   new bootstrap.Modal(document.getElementById("editorModal")).show();
-// }
-
-// function atualizarListaProfessores() {
-//   const lista = document.getElementById("listaProfessores");
-//   lista.innerHTML = "";
-//   professores.forEach((prof, i) => {
-//     const li = document.createElement("li");
-//     li.className =
-//       "list-group-item d-flex justify-content-between align-items-center";
-//     li.innerHTML = `${prof}<button class="btn-remover" onclick="removerProfessor(${i})">Remover</button>`;
-//     lista.appendChild(li);
-//   });
-// }
-
-// function atualizarListaSalas() {
-//   const lista = document.getElementById("listaSalas");
-//   lista.innerHTML = "";
-//   salas.forEach((sala, i) => {
-//     const li = document.createElement("li");
-//     li.className =
-//       "list-group-item d-flex justify-content-between align-items-center";
-//     li.innerHTML = `${sala}<button class="btn-remover" onclick="removerSala(${i})">Remover</button>`;
-//     lista.appendChild(li);
-//   });
-// }
-// function removerProfessor(index) {
-//   const professor = professores[index];
-//   const confirmar = confirm(`Deseja remover o professor "${professor}"?`);
-//   if (!confirmar) return;
-
-//   professores.splice(index, 1);
-//   localStorage.setItem("professores", JSON.stringify(professores));
-//   populateSelect("professor", professores);
-//   atualizarListaProfessores();
-// }
-
-// function removerSala(index) {
-//   const sala = salas[index];
-//   const confirmar = confirm(`Deseja remover a sala "${sala}"?`);
-//   if (!confirmar) return;
-
-//   salas.splice(index, 1);
-//   localStorage.setItem("salas", JSON.stringify(salas));
-//   populateSelect("salas", salas);
-//   atualizarListaSalas();
-// }
-
-// // Logout
-// function logout() {
-//   window.location.href = "index.html";
-// }
-
-// // Inicialização
-// document.addEventListener("DOMContentLoaded", () => {
-//   populateSelect("salas", salas);
-//   populateSelect("turno", turnos);
-//   populateSelect("professor", professores);
-//   generateCalendar();
-
-//   document.getElementById("salas").addEventListener("change", generateCalendar);
-//   document
-//     .getElementById("prevMonth")
-//     .addEventListener("click", () => changeMonth(-1));
-//   document
-//     .getElementById("nextMonth")
-//     .addEventListener("click", () => changeMonth(1));
-//   document
-//     .getElementById("confirmarAgendamento")
-//     .addEventListener("click", confirmarAgendamento);
-// });
+// Remove um agendamento
+async function removerAgendamento(id) {
+  const { error } = await deleteBooking(id);
+  if (error) {
+    console.error(error);
+    alert("Erro ao remover agendamento.");
+    return;
+  }
+  await generateCalendar();
+}
