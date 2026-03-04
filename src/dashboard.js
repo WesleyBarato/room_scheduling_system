@@ -11,11 +11,12 @@ async function getTeachers() {
 }
 
 async function createRoom(room) {
-  if (!room) {
-    return await supabase.from("rooms").insert(room);
-  } else {
-    alert("Esta sala já existe!");
-  }
+  const { data, error } = await supabase
+    .from("rooms")
+    .insert(room)
+    .select();
+
+  return { data, error };
 }
 
 async function createTeacher(teacher) {
@@ -56,6 +57,36 @@ async function createBooking(booking) {
 
 async function deleteBooking(id) {
   const { error } = await supabase.from("bookings").delete().eq("id", id);
+  return { error };
+}
+
+async function updateRoom(id, room) {
+  const { data, error } = await supabase
+    .from("rooms")
+    .update(room)
+    .eq("id", id)
+    .select();
+
+  return { data, error };
+}
+
+async function deleteRoom(id) {
+  const { error } = await supabase.from("rooms").delete().eq("id", id);
+  return { error };
+}
+
+async function updateTeacher(id, teacher) {
+  const { data, error } = await supabase
+    .from("teachers")
+    .update(teacher)
+    .eq("id", id)
+    .select();
+
+  return { data, error };
+}
+
+async function deleteTeacher(id) {
+  const { error } = await supabase.from("teachers").delete().eq("id", id);
   return { error };
 }
 
@@ -119,22 +150,28 @@ async function loadTeachersSelect() {
 async function handleRoomSubmit(event) {
   event.preventDefault();
 
-  // get the room value
-  const room = document.getElementById("newRoom").value;
+  const roomName = document.getElementById("newRoom")?.value?.trim();
+  if (!roomName) {
+    alert("Digite o nome da sala.");
+    return;
+  }
 
-  // create the object
-  const newRoom = {
-    name: room,
-  };
+  const newRoom = { name: roomName };
 
   const { data, error } = await createRoom(newRoom);
 
   if (error) {
     console.error(error);
+    if (error.code === "23505") {
+      alert("Esta sala já existe!");
+    } else {
+      alert("Erro ao criar sala. Tente novamente.");
+    }
     return;
   }
 
   alert("Sala criada!");
+  document.getElementById("newRoom").value = "";
   await loadRoomsSelect();
 }
 
@@ -254,16 +291,141 @@ function setupCalendarEvents() {
   });
 }
 
+// Verifica se o usuário está logado
+async function checkAuth() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    window.location.href = "index.html";
+    return false;
+  }
+  return true;
+}
+
 // Logout e abrir editor (usados pelo HTML onclick)
-function logout() {
+async function logout() {
+  await supabase.auth.signOut();
   window.location.href = "index.html";
 }
 
-function abrirEditor() {
+async function abrirEditor() {
+  await atualizarListaProfessores();
+  await atualizarListaSalas();
   const modal = document.getElementById("editorModal");
   if (modal && typeof bootstrap !== "undefined") {
     new bootstrap.Modal(modal).show();
   }
+}
+
+async function atualizarListaProfessores() {
+  const { data, error } = await getTeachers();
+  const lista = document.getElementById("listaProfessores");
+  if (!lista || error) return;
+
+  lista.innerHTML = "";
+  (data || []).forEach((prof) => {
+    const li = document.createElement("li");
+    li.className = "list-group-item d-flex justify-content-between align-items-center";
+    li.innerHTML = `
+      <span class="professor-nome" data-id="${prof.id}">${prof.name}</span>
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-primary btn-editar-prof" data-id="${prof.id}" data-name="${escapeHtml(prof.name)}">Editar</button>
+        <button type="button" class="btn btn-danger btn-remover-prof" data-id="${prof.id}" data-name="${escapeHtml(prof.name)}">Remover</button>
+      </div>
+    `;
+    lista.appendChild(li);
+  });
+
+  lista.querySelectorAll(".btn-editar-prof").forEach((btn) => {
+    btn.addEventListener("click", () => editarProfessor(btn.dataset.id, btn.dataset.name));
+  });
+  lista.querySelectorAll(".btn-remover-prof").forEach((btn) => {
+    btn.addEventListener("click", () => removerProfessor(btn.dataset.id, btn.dataset.name));
+  });
+}
+
+async function atualizarListaSalas() {
+  const { data, error } = await getRooms();
+  const lista = document.getElementById("listaSalas");
+  if (!lista || error) return;
+
+  lista.innerHTML = "";
+  (data || []).forEach((room) => {
+    const li = document.createElement("li");
+    li.className = "list-group-item d-flex justify-content-between align-items-center";
+    li.innerHTML = `
+      <span class="sala-nome" data-id="${room.id}">${room.name}</span>
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-primary btn-editar-sala" data-id="${room.id}" data-name="${escapeHtml(room.name)}">Editar</button>
+        <button type="button" class="btn btn-danger btn-remover-sala" data-id="${room.id}" data-name="${escapeHtml(room.name)}">Remover</button>
+      </div>
+    `;
+    lista.appendChild(li);
+  });
+
+  lista.querySelectorAll(".btn-editar-sala").forEach((btn) => {
+    btn.addEventListener("click", () => editarSala(btn.dataset.id, btn.dataset.name));
+  });
+  lista.querySelectorAll(".btn-remover-sala").forEach((btn) => {
+    btn.addEventListener("click", () => removerSala(btn.dataset.id, btn.dataset.name));
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML.replace(/"/g, "&quot;");
+}
+
+async function editarProfessor(id, currentName) {
+  const novoNome = prompt("Novo nome do professor:", currentName);
+  if (novoNome === null || novoNome.trim() === "") return;
+
+  const { error } = await updateTeacher(id, { name: novoNome.trim() });
+  if (error) {
+    if (error.code === "23505") alert("Já existe um professor com esse nome.");
+    else alert("Erro ao atualizar. Tente novamente.");
+    return;
+  }
+  await atualizarListaProfessores();
+  await loadTeachersSelect();
+}
+
+async function removerProfessor(id, name) {
+  if (!confirm(`Remover o professor "${name}"? Isso pode falhar se houver agendamentos.`)) return;
+
+  const { error } = await deleteTeacher(id);
+  if (error) {
+    alert("Não foi possível remover. Verifique se há agendamentos vinculados.");
+    return;
+  }
+  await atualizarListaProfessores();
+  await loadTeachersSelect();
+}
+
+async function editarSala(id, currentName) {
+  const novoNome = prompt("Novo nome da sala:", currentName);
+  if (novoNome === null || novoNome.trim() === "") return;
+
+  const { error } = await updateRoom(id, { name: novoNome.trim() });
+  if (error) {
+    if (error.code === "23505") alert("Já existe uma sala com esse nome.");
+    else alert("Erro ao atualizar. Tente novamente.");
+    return;
+  }
+  await atualizarListaSalas();
+  await loadRoomsSelect();
+}
+
+async function removerSala(id, name) {
+  if (!confirm(`Remover a sala "${name}"? Isso pode falhar se houver agendamentos.`)) return;
+
+  const { error } = await deleteRoom(id);
+  if (error) {
+    alert("Não foi possível remover. Verifique se há agendamentos vinculados.");
+    return;
+  }
+  await atualizarListaSalas();
+  await loadRoomsSelect();
 }
 
 // Expor para onclick no HTML (ES modules não coloca funções no global)
@@ -273,6 +435,9 @@ window.abrirEditor = abrirEditor;
 // INIT
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const autenticado = await checkAuth();
+  if (!autenticado) return;
+
   loadRoomsSelect();
   loadTurnsSelect();
   loadTeachersSelect();

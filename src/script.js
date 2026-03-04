@@ -1,6 +1,11 @@
 import { supabase } from "./supabase.js";
 import "./style.css";
 
+// Redireciona se já estiver logado
+supabase.auth.getSession().then(({ data: { session } }) => {
+  if (session) window.location.href = "dashboard.html";
+});
+
 const form = document.getElementById("loginForm");
 
 form.addEventListener("submit", async (event) => {
