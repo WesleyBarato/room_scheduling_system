@@ -20,7 +20,7 @@ This system is not just a scheduler. It is a platform that will integrate:
 
 ---
 
-# Current Version – V1 (MVP)
+# Current Version – V1 (MVP - Ready to deploy) 
 
 Core features:
 
