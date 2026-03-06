@@ -20,7 +20,7 @@ This system is not just a scheduler. It is a platform that will integrate:
 
 ---
 
-# Current Version – V1 (MVP - Ready to deploy) 
+# Current Version – V1 (Deployed and in use)
 
 Core features:
 
@@ -31,12 +31,24 @@ Core features:
 • Simple and fast interface  
 • Real-time database integration (Supabase)
 
-Technology stack:
+# Tech Stack
+
+Frontend
 
 • JavaScript (Vanilla)  
 • Vite  
+• HTML  
+• CSS  
+
+Backend
+
 • Supabase  
-• HTML / CSS
+• PostgreSQL  
+• Supabase Auth  
+
+Infrastructure
+
+• Vercel (deployment)
 
 Purpose:
 
@@ -147,7 +159,7 @@ Future integrations:
 
 Current version:
 
-V1 – MVP in development
+V1 – Deployed and in use
 
 ---
 
@@ -206,9 +218,22 @@ Funcionalidades:
 
 Tecnologias:
 
-• JavaScript  
+Frontend
+
+• JavaScript (Vanilla)  
 • Vite  
-• Supabase
+• HTML  
+• CSS  
+
+Backend
+
+• Supabase  
+• PostgreSQL  
+• Supabase Auth  
+
+Infra
+
+• Vercel (deployment)
 
 Objetivo:
 
@@ -246,7 +271,7 @@ Sistema SaaS comercial.
 
 Versão atual:
 
-V1 – MVP
+V1 – Feito o deploy e está em uso
 
 ---
 
